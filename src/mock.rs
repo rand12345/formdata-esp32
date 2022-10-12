@@ -23,11 +23,11 @@
 // THE SOFTWARE.
 
 use std::fmt;
-use std::io::{self, Read, Write, Cursor};
+use std::io::{self, Cursor, Read, Write};
 use std::net::SocketAddr;
 use std::time::Duration;
 
-use hyper::net::NetworkStream;
+// use hyper::net::NetworkStream;
 
 pub struct MockStream {
     pub read: Cursor<Vec<u8>>,
@@ -45,7 +45,12 @@ impl Clone for MockStream {
 
 impl fmt::Debug for MockStream {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "MockStream {{ read: {:?}, write: {:?} }}", self.read.get_ref(), self.write)
+        write!(
+            f,
+            "MockStream {{ read: {:?}, write: {:?} }}",
+            self.read.get_ref(),
+            self.write
+        )
     }
 }
 
@@ -81,16 +86,16 @@ impl Write for MockStream {
     }
 }
 
-impl NetworkStream for MockStream {
-    fn peer_addr(&mut self) -> io::Result<SocketAddr> {
-        Ok("127.0.0.1:1337".parse().unwrap())
-    }
+// impl NetworkStream for MockStream {
+//     fn peer_addr(&mut self) -> io::Result<SocketAddr> {
+//         Ok("127.0.0.1:1337".parse().unwrap())
+//     }
 
-    fn set_read_timeout(&self, _: Option<Duration>) -> io::Result<()> {
-        Ok(())
-    }
+//     fn set_read_timeout(&self, _: Option<Duration>) -> io::Result<()> {
+//         Ok(())
+//     }
 
-    fn set_write_timeout(&self, _: Option<Duration>) -> io::Result<()> {
-        Ok(())
-    }
-}
+//     fn set_write_timeout(&self, _: Option<Duration>) -> io::Result<()> {
+//         Ok(())
+//     }
+// }

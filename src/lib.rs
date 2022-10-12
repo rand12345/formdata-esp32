@@ -70,16 +70,17 @@
 //! }
 //! ```
 
-#![cfg_attr(feature="clippy", feature(plugin))]
-#![cfg_attr(feature="clippy", plugin(clippy))]
+// #![cfg_attr(feature="clippy", feature(plugin))]
+// #![cfg_attr(feature="clippy", plugin(clippy))]
 
+#![allow(clippy::recursive_format_impl)]
+extern crate encoding;
 extern crate httparse;
 extern crate hyper;
+extern crate log;
 #[cfg_attr(test, macro_use)]
 extern crate mime;
 extern crate textnonce;
-extern crate log;
-extern crate encoding;
 
 extern crate mime_multipart;
 
@@ -91,15 +92,14 @@ mod mock;
 pub use error::Error;
 pub use form_data::FormData;
 
-use std::io::{Read, Write};
-use hyper::header::{Headers, ContentDisposition, DispositionParam};
-use mime_multipart::Node;
-pub use mime_multipart::FilePart;
+use hyper::header::{ContentDisposition, DispositionParam, Headers};
 pub use mime_multipart::generate_boundary;
+pub use mime_multipart::FilePart;
+use mime_multipart::Node;
+use std::io::{Read, Write};
 
 /// Parse MIME `multipart/form-data` information from a stream as a `FormData`.
-pub fn read_formdata<S: Read>(stream: &mut S, headers: &Headers) -> Result<FormData, Error>
-{
+pub fn read_formdata<S: Read>(stream: &mut S, headers: &Headers) -> Result<FormData, Error> {
     let nodes = mime_multipart::read_multipart_body(stream, headers, false)?;
 
     let mut formdata = FormData::new();
@@ -111,8 +111,7 @@ pub fn read_formdata<S: Read>(stream: &mut S, headers: &Headers) -> Result<FormD
 // into one of two buckets (fields and files);  If a multipart node is found, it uses
 // the name in its headers as the key (rather than the name in the headers of the
 // subparts), which is how multiple file uploads work.
-fn fill_formdata(formdata: &mut FormData, nodes: Vec<Node>) -> Result<(), Error>
-{
+fn fill_formdata(formdata: &mut FormData, nodes: Vec<Node>) -> Result<(), Error> {
     for node in nodes {
         match node {
             Node::Part(part) => {
@@ -126,7 +125,7 @@ fn fill_formdata(formdata: &mut FormData, nodes: Vec<Node>) -> Result<(), Error>
                 let key = cd_name.ok_or(Error::NoName)?;
                 let val = String::from_utf8(part.body)?;
                 formdata.fields.push((key, val));
-            },
+            }
             Node::File(part) => {
                 let cd_name: Option<String> = {
                     let cd: &ContentDisposition = match part.headers.get() {
@@ -152,11 +151,11 @@ fn fill_formdata(formdata: &mut FormData, nodes: Vec<Node>) -> Result<(), Error>
                         Node::Part(part) => {
                             let val = String::from_utf8(part.body)?;
                             formdata.fields.push((key.clone(), val));
-                        },
+                        }
                         Node::File(part) => {
                             formdata.files.push((key.clone(), part));
-                        },
-                        _ => { } // don't recurse deeper
+                        }
+                        _ => {} // don't recurse deeper
                     }
                 }
             }
@@ -167,25 +166,24 @@ fn fill_formdata(formdata: &mut FormData, nodes: Vec<Node>) -> Result<(), Error>
 
 #[inline]
 fn get_content_disposition_name(cd: &ContentDisposition) -> Option<String> {
-    if let Some(&DispositionParam::Ext(_, ref value)) = cd.parameters.iter()
-        .find(|&x| match *x {
-            DispositionParam::Ext(ref token,_) => &*token == "name",
-            _ => false,
-        })
-    {
+    if let Some(&DispositionParam::Ext(_, ref value)) = cd.parameters.iter().find(|&x| match *x {
+        DispositionParam::Ext(ref token, _) => &*token == "name",
+        _ => false,
+    }) {
         Some(value.clone())
     } else {
         None
     }
 }
 
-
 /// Stream out `multipart/form-data` body content matching the passed in `formdata`.  This
 /// does not stream out headers, so the caller must stream those out before calling
 /// write_formdata().
-pub fn write_formdata<S: Write>(stream: &mut S, boundary: &Vec<u8>, formdata: &FormData)
-                                -> Result<usize, Error>
-{
+pub fn write_formdata<S: Write>(
+    stream: &mut S,
+    boundary: &Vec<u8>,
+    formdata: &FormData,
+) -> Result<usize, Error> {
     let nodes = formdata.to_multipart()?;
 
     // Write out
@@ -197,9 +195,11 @@ pub fn write_formdata<S: Write>(stream: &mut S, boundary: &Vec<u8>, formdata: &F
 /// Stream out `multipart/form-data` body content matching the passed in `formdata` as
 /// Transfer-Encoding: Chunked.  This does not stream out headers, so the caller must stream
 /// those out before calling write_formdata().
-pub fn write_formdata_chunked<S: Write>(stream: &mut S, boundary: &Vec<u8>, formdata: &FormData)
-                                        -> Result<(), Error>
-{
+pub fn write_formdata_chunked<S: Write>(
+    stream: &mut S,
+    boundary: &Vec<u8>,
+    formdata: &FormData,
+) -> Result<(), Error> {
     let nodes = formdata.to_multipart()?;
 
     // Write out
@@ -208,24 +208,26 @@ pub fn write_formdata_chunked<S: Write>(stream: &mut S, boundary: &Vec<u8>, form
     Ok(())
 }
 
-
 #[cfg(test)]
 mod tests {
     extern crate tempdir;
 
-    use super::{FormData, read_formdata, write_formdata, write_formdata_chunked,
-                FilePart, generate_boundary};
+    use super::{
+        generate_boundary, read_formdata, write_formdata, write_formdata_chunked, FilePart,
+        FormData,
+    };
 
-    use std::net::SocketAddr;
     use std::fs::File;
     use std::io::Write;
+    use std::net::SocketAddr;
 
     use hyper::buffer::BufReader;
+    use hyper::header::{
+        ContentDisposition, ContentType, DispositionParam, DispositionType, Headers,
+    };
     use hyper::net::NetworkStream;
     use hyper::server::Request as HyperRequest;
-    use hyper::header::{Headers, ContentDisposition, DispositionParam, ContentType,
-                        DispositionType};
-    use mime::{Mime, TopLevel, SubLevel};
+    use mime::{Mime, SubLevel, TopLevel};
 
     use mock::MockStream;
 
@@ -274,14 +276,14 @@ mod tests {
                     if &key == "field2" {
                         assert_eq!(file.size, Some(30));
                         assert_eq!(&*file.filename().unwrap().unwrap(), "image.gif");
-                        assert_eq!(file.content_type().unwrap(), mime!(Image/Gif));
+                        assert_eq!(file.content_type().unwrap(), mime!(Image / Gif));
                     } else if &key == "field3" {
                         assert_eq!(file.size, Some(14));
                         assert_eq!(&*file.filename().unwrap().unwrap(), "file.txt");
                         assert!(file.content_type().is_none());
                     }
                 }
-            },
+            }
             Err(err) => panic!("{}", err),
         }
     }
@@ -332,15 +334,14 @@ mod tests {
                 assert_eq!(key, "field2");
                 assert_eq!(file.size, Some(30));
                 assert_eq!(&*file.filename().unwrap().unwrap(), "image.gif");
-                assert_eq!(file.content_type().unwrap(), mime!(Image/Gif));
+                assert_eq!(file.content_type().unwrap(), mime!(Image / Gif));
 
                 let (ref key, ref file) = form_data.files[1];
                 assert!(key == "field2");
                 assert_eq!(file.size, Some(14));
                 assert_eq!(&*file.filename().unwrap().unwrap(), "file.txt");
                 assert!(file.content_type().is_none());
-
-            },
+            }
             Err(err) => panic!("{}", err),
         }
     }
@@ -400,12 +401,12 @@ mod tests {
                         }
                         "awesome_image.gif" => {
                             assert_eq!(file.size, Some(37));
-                            assert_eq!(file.content_type().unwrap(), mime!(Image/Gif));
-                        },
+                            assert_eq!(file.content_type().unwrap(), mime!(Image / Gif));
+                        }
                         _ => unreachable!(),
                     }
                 }
-            },
+            }
             Err(err) => panic!("{}", err),
         }
     }
@@ -422,14 +423,18 @@ mod tests {
         photo_headers.set(ContentType(Mime(TopLevel::Image, SubLevel::Gif, vec![])));
         photo_headers.set(ContentDisposition {
             disposition: DispositionType::Ext("form-data".to_owned()),
-            parameters: vec![DispositionParam::Ext("name".to_owned(), "photo".to_owned()),
-                             DispositionParam::Ext("filename".to_owned(), "mike.gif".to_owned())],
+            parameters: vec![
+                DispositionParam::Ext("name".to_owned(), "photo".to_owned()),
+                DispositionParam::Ext("filename".to_owned(), "mike.gif".to_owned()),
+            ],
         });
 
         let formdata = FormData {
-            fields: vec![ ("name".to_owned(), "Mike".to_owned()),
-                            ("age".to_owned(), "46".to_owned()) ],
-            files: vec![ ("photo".to_owned(), FilePart::new(photo_headers, &tmppath)) ],
+            fields: vec![
+                ("name".to_owned(), "Mike".to_owned()),
+                ("age".to_owned(), "46".to_owned()),
+            ],
+            files: vec![("photo".to_owned(), FilePart::new(photo_headers, &tmppath))],
         };
 
         let mut output: Vec<u8> = Vec::new();
@@ -441,7 +446,6 @@ mod tests {
 
         println!("{}", String::from_utf8_lossy(&output));
     }
-
 
     #[test]
     fn chunked_writer() {
@@ -455,14 +459,18 @@ mod tests {
         photo_headers.set(ContentType(Mime(TopLevel::Image, SubLevel::Gif, vec![])));
         photo_headers.set(ContentDisposition {
             disposition: DispositionType::Ext("form-data".to_owned()),
-            parameters: vec![DispositionParam::Ext("name".to_owned(), "photo".to_owned()),
-                             DispositionParam::Ext("filename".to_owned(), "mike.gif".to_owned())],
+            parameters: vec![
+                DispositionParam::Ext("name".to_owned(), "photo".to_owned()),
+                DispositionParam::Ext("filename".to_owned(), "mike.gif".to_owned()),
+            ],
         });
 
         let formdata = FormData {
-            fields: vec![ ("name".to_owned(), "Mike".to_owned()),
-                            ("age".to_owned(), "46".to_owned()) ],
-            files: vec![ ("photo".to_owned(), FilePart::new(photo_headers, &tmppath)) ],
+            fields: vec![
+                ("name".to_owned(), "Mike".to_owned()),
+                ("age".to_owned(), "46".to_owned()),
+            ],
+            files: vec![("photo".to_owned(), FilePart::new(photo_headers, &tmppath))],
         };
 
         let mut output: Vec<u8> = Vec::new();
